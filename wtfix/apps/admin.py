@@ -736,32 +736,32 @@ class SeqNumManagerApp(MessageTypeHandlerApp):
             resend_msg = await message_store.get_sent(
                 seq_num
             )  # Retrieve the message from the MessageStore
+            if resend_msg is not None:
+                if resend_msg.MsgType in SeqNumManagerApp.ADMIN_MESSAGES:
+                    # Admin message - continue: to see if there are more sequential ones after this one
+                    admin_seq_nums.append(resend_msg.seq_num)
+                    continue
 
-            if resend_msg.MsgType in SeqNumManagerApp.ADMIN_MESSAGES:
-                # Admin message - continue: to see if there are more sequential ones after this one
-                admin_seq_nums.append(resend_msg.seq_num)
-                continue
-
-            if len(admin_seq_nums) > 0:
-                # Admin messages were found, submit SequenceReset
-                asyncio.create_task(
-                    self.send(
-                        admin.SequenceResetMessage(next_seq_num, admin_seq_nums[-1] + 1)
+                if len(admin_seq_nums) > 0:
+                    # Admin messages were found, submit SequenceReset
+                    asyncio.create_task(
+                        self.send(
+                            admin.SequenceResetMessage(next_seq_num, admin_seq_nums[-1] + 1)
+                        )
                     )
-                )
-                next_seq_num = admin_seq_nums[-1] + 1
-                admin_seq_nums.clear()
+                    next_seq_num = admin_seq_nums[-1] + 1
+                    admin_seq_nums.clear()
 
-            # Resend message
-            resend_msg = (
-                resend_msg.copy()
-            )  # Make a copy so that we do not change entries in the send log.
-            resend_msg.MsgSeqNum = next_seq_num
-            resend_msg.PossDupFlag = "Y"
-            resend_msg.OrigSendingTime = str(resend_msg.SendingTime)
+                # Resend message
+                resend_msg = (
+                    resend_msg.copy()
+                )  # Make a copy so that we do not change entries in the send log.
+                resend_msg.MsgSeqNum = next_seq_num
+                resend_msg.PossDupFlag = "Y"
+                resend_msg.OrigSendingTime = str(resend_msg.SendingTime)
 
-            asyncio.create_task(self.send(resend_msg))
-            next_seq_num += 1
+                asyncio.create_task(self.send(resend_msg))
+                next_seq_num += 1
 
         else:
             # Handle situation where last message was itself an admin message
